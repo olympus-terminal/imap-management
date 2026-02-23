@@ -79,7 +79,7 @@ class GmailCleaner:
         folder = folder_map.get(folder.lower(), folder)
         self.current_folder = folder
         try:
-            status, data = self.mail.select(folder)
+            status, data = self.mail.select(f'"{folder}"')
             if status != 'OK':
                 raise Exception(f"Failed to select folder: {folder}")
             return int(data[0])
@@ -588,6 +588,8 @@ Examples:
                         help='Number of emails to delete per batch (default: 500)')
     parser.add_argument('--delay', type=float, default=1.0,
                         help='Seconds to wait between batches to avoid rate limits (default: 1.0)')
+    parser.add_argument('--yes', '-y', action='store_true',
+                        help='Skip confirmation prompt')
 
     args = parser.parse_args()
 
@@ -676,7 +678,10 @@ Examples:
                     print(f"\nFound {len(msg_ids)} emails to delete.")
                     if args.loop:
                         print("Loop mode: will keep deleting batches until done.")
-                    confirm = input("Type 'yes' to confirm: ")
+                    if args.yes:
+                        confirm = 'yes'
+                    else:
+                        confirm = input("Type 'yes' to confirm: ")
                     if confirm.lower() == 'yes':
                         total_deleted = 0
                         round_num = 1
