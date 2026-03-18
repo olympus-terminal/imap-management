@@ -312,7 +312,10 @@ class GmailCleaner:
             parts = []
             for content, charset in decoded:
                 if isinstance(content, bytes):
-                    parts.append(content.decode(charset or 'utf-8', errors='replace'))
+                    try:
+                        parts.append(content.decode(charset or 'utf-8', errors='replace'))
+                    except (LookupError, UnicodeDecodeError):
+                        parts.append(content.decode('utf-8', errors='replace'))
                 else:
                     parts.append(content)
             return ' '.join(parts)
@@ -344,7 +347,7 @@ class GmailCleaner:
         return summaries
 
     def delete_emails(self, query: str = None, gmail_query: str = None, batch_size: int = 500, dry_run: bool = True, delay: float = 1.0) -> int:
-        """Delete emails matching query. Moves to Trash (Gmail behavior)."""
+        """Delete emails matching query. Uses IMAP MOVE to Trash for Gmail."""
         if gmail_query:
             msg_ids = self.search_gmail(gmail_query)
         else:
@@ -372,42 +375,36 @@ class GmailCleaner:
             # Retry loop with exponential backoff
             for attempt in range(max_retries):
                 try:
-                    # Move to trash using UID STORE
-                    self.mail.uid('STORE', msg_set.decode(), '+FLAGS', '\\Deleted')
+                    # Use IMAP MOVE to Trash - this actually removes from All Mail
+                    # (STORE \Deleted + EXPUNGE silently does nothing in Gmail All Mail)
+                    self.mail.uid('MOVE', msg_set.decode(), '"[Gmail]/Trash"')
                     deleted += len(batch)
-                    print(f"Deleted {deleted}/{total} emails...")
+                    print(f"Deleted {deleted}/{total} emails (moved to trash)", flush=True)
                     break  # Success, exit retry loop
                 except imaplib.IMAP4.error as e:
                     error_str = str(e)
                     if 'System Error' in error_str or 'EOF' in error_str:
                         wait_time = (2 ** attempt) * 2  # 2, 4, 8, 16, 32 seconds
-                        print(f"Rate limited or connection error. Waiting {wait_time}s before retry {attempt+1}/{max_retries}...")
+                        print(f"Rate limited or connection error. Waiting {wait_time}s before retry {attempt+1}/{max_retries}...", flush=True)
                         time.sleep(wait_time)
                         try:
                             self.reconnect()
                         except Exception as reconn_err:
-                            print(f"Reconnect failed: {reconn_err}")
+                            print(f"Reconnect failed: {reconn_err}", flush=True)
                             if attempt == max_retries - 1:
                                 raise
                     else:
                         raise  # Unknown error, don't retry
             else:
                 # All retries exhausted
-                print(f"Failed after {max_retries} retries. Deleted {deleted} emails before failure.")
+                print(f"Failed after {max_retries} retries. Deleted {deleted} emails before failure.", flush=True)
                 return deleted
 
             # Rate limiting: pause between batches
             if i + batch_size < total:
                 time.sleep(delay)
 
-        try:
-            self.mail.expunge()
-        except imaplib.IMAP4.error:
-            print("Expunge failed, but emails should still be marked for deletion.")
-
-        print(f"\nMoved {deleted} emails to Trash")
-        print("Note: Emails in Trash will be permanently deleted after 30 days")
-        print("To empty trash immediately, run with --folder trash --delete")
+        print(f"\nDeleted {deleted} emails (all moved to trash).", flush=True)
         return deleted
 
     def analyze_inbox(self, limit: int = 1000) -> dict:

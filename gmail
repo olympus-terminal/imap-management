@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Gmail cleanup wrapper - zum8zum@gmail.com
+# Gmail cleanup wrapper
 # Usage: ./gmail <command> [query] [options]
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CLEANUP="$SCRIPT_DIR/gmail_cleanup.py"
-EMAIL="zum8zum@gmail.com"
+EMAIL="${GMAIL_ADDRESS:-your-email@gmail.com}"
 PASSWORD_FILE="$SCRIPT_DIR/app_password.txt"
 
 # Defaults
@@ -16,7 +16,7 @@ DELAY=1.0
 
 usage() {
     cat <<'EOF'
-Gmail Cleanup Tool - zum8zum@gmail.com
+Gmail Cleanup Tool
 
 Usage: gmail <command> [gmail-query] [options]
 
