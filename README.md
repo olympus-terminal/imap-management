@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="imap-management banner" width="100%">
+</p>
+
 # IMAP Management Tools
 
 Command-line tools for managing large IMAP mailboxes, particularly Gmail.
